@@ -22,5 +22,5 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run KZSU JSON:API probe
+      - name: Run KZSU Music JSON:API probe
         run: node scripts/monitor.js
