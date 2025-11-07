@@ -35,7 +35,7 @@ function paginateUrl(url) {
         const match = shows.data.find(show => show.attributes.name === TEST_NAME);
         if (match) {
             pid = match.id;
-            list = `${BASE_URL}api/v1/playlist/${pid}`;
+            list = `api/v1/playlist/${pid}`;
         } else {
             res = await fetch(`${BASE_URL}api/v1/playlist`, {
                 method: "POST",
