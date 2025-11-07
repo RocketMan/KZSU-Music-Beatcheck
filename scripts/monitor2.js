@@ -1,7 +1,7 @@
 const fetch = require("node-fetch");
 const { performance } = require("perf_hooks");
 
-const BASE_URL = "https://zookeeper.stanford.edu:9443/";
+const BASE_URL = "https://zookeeper.stanford.edu/";
 const TEST_COMMENT = "TEST COMMENT";
 const TEST_TRACK = "TEST TRACK";
 const TEST_NAME = "TEST Show";
