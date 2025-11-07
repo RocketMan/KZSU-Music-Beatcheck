@@ -8,6 +8,18 @@ const TEST_NAME = "TEST Show";
 const TEST_AIRNAME = "KZSU Music Beatcheck";
 const API_KEY = process.env.APIKEY;
 
+let paginateSeq = 1;
+
+/**
+ * perturb the URL to avoid tripping DoS countermeasures
+ *
+ * useful for rapid requests to the same URL
+ */
+function paginateUrl(url) {
+    return url.replace(/\/v1(\.\d+)?\//, `/v1.${paginateSeq++}/`);
+}
+
+
 (async () => {
     const start = performance.now();
     try {
@@ -49,7 +61,7 @@ const API_KEY = process.env.APIKEY;
         }
 
         // 2. Insert Comment
-        res = await fetch(`${BASE_URL}${list}/events`, {
+        res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/vnd.api+json",
@@ -70,7 +82,7 @@ const API_KEY = process.env.APIKEY;
         cid = json2.data.id;
 
         // 3. Insert Spin
-        res = await fetch(`${BASE_URL}${list}/events`, {
+        res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/vnd.api+json",
@@ -94,7 +106,7 @@ const API_KEY = process.env.APIKEY;
         sid = json3.data.id;
 
         // 4. Move Track
-        res = await fetch(`${BASE_URL}${list}/events`, {
+        res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/vnd.api+json",
@@ -126,7 +138,7 @@ const API_KEY = process.env.APIKEY;
         }
 
         // 6. Delete Comment
-        res = await fetch(`${BASE_URL}${list}/events`, {
+        res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
             method: "DELETE",
             headers: {
                 "Content-Type": "application/vnd.api+json",
@@ -139,7 +151,7 @@ const API_KEY = process.env.APIKEY;
         if (res.status !== 204) throw new Error("Delete comment failed");
 
         // 7. Delete Spin
-        res = await fetch(`${BASE_URL}${list}/events`, {
+        res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
             method: "DELETE",
             headers: {
                 "Content-Type": "application/vnd.api+json",
