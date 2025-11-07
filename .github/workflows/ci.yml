@@ -23,4 +23,4 @@ jobs:
         run: npm install
 
       - name: Run KZSU Music JSON:API probe
-        run: node scripts/uptime.js
+        run: node scripts/monitor2.js
