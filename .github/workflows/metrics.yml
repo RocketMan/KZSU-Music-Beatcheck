@@ -1,0 +1,42 @@
+name: Probe Metrics Logger
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # Every 5 minutes
+  workflow_dispatch:      # Allow manual runs
+
+jobs:
+  log-metrics:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Download previous metrics artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: probe-metrics
+          path: ./metrics
+
+      - name: Install dependencies
+        run: npm install node-fetch
+
+      - name: Run metrics.js
+        env:
+          APIKEY: ${{ secrets.APIKEY }}
+        run: |
+          mkdir -p ./metrics
+          node scripts/metrics.js
+
+      - name: Upload updated metrics artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: probe-metrics
+          path: ./metrics/metrics.csv
+
