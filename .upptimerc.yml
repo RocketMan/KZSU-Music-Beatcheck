@@ -19,13 +19,15 @@ status-website:
   # baseUrl: /your-repo-name
   baseUrl: /KZSU-Music-Beatcheck
   logoUrl: https://raw.githubusercontent.com/upptime/upptime.js.org/master/static/img/icon.svg
-  name: Upptime
-  introTitle: "**Upptime** is the open-source uptime monitor and status page, powered entirely by GitHub."
-  introMessage: This is a sample status page which uses **real-time** data from our [GitHub repository](https://github.com/upptime/upptime). No server required — just GitHub Actions, Issues, and Pages. [**Get your own for free**](https://github.com/upptime/upptime)
+  name: KZSU Music Beatcheck
+  introTitle: "**KZSU Music Beatcheck** is an uptime monitor for [KZSU Music](https://zookeeper.stanford.edu/)."
+  introMessage: The monitor runs every 5 minutes and will automatically open Issues for detected outages.  The response time graphs are updated 4 times per day.  The main website, the streams server, and Zootopia are also monitored for reference.
   navbar:
     - title: Status
       href: /
-    - title: GitHub
+    - title: Zookeeper Online repo
+      href: https://github.com/RocketMan/zookeeper
+    - title: KZSU Music Beatcheck repo
       href: https://github.com/$OWNER/$REPO
 
 # Upptime also supports notifications, assigning issues, and more
