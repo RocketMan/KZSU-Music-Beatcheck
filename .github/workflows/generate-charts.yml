@@ -23,7 +23,6 @@ on:
 permissions:
   actions: read
   contents: write   # needed if pushing to gh-pages
-  contents: read
 
 env:
   LOOKBACK_RUNS: "20"          # how many completed workflow runs to inspect for artifacts
