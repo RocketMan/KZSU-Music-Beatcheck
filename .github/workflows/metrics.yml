@@ -3,7 +3,7 @@ name: Probe Metrics Logger
 on:
   schedule:
     - cron: '*/5 * * * *' # Every 5 minutes
-  workflow_dispatch:      # Allow manual runs
+  workflow_dispatch:
 
 jobs:
   log-metrics:
@@ -11,18 +11,19 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      - name: Access metrics cache
-        uses: actions/cache@v4
+      - name: Restore metrics cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: ./metrics
-          key: probe-metrics-cache
+          key: probe-metrics
 
       - name: Install dependencies
         run: npm install node-fetch
@@ -34,8 +35,16 @@ jobs:
           mkdir -p ./metrics
           node scripts/metrics.js
 
-      - name: Upload artifact
+      - name: Save metrics cache
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ./metrics
+          key: ${{ steps.cache-restore.outputs.cache-primary-key }}
+
+      - name: Upload updated metrics artifact
         uses: actions/upload-artifact@v4
         with:
           name: probe-metrics
           path: ./metrics/metrics.csv
+
