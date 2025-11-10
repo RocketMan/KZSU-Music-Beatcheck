@@ -36,7 +36,6 @@ jobs:
           node scripts/metrics.js
 
       - name: Save metrics cache
-        if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ./metrics
