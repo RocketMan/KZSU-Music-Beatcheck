@@ -10,7 +10,6 @@ permissions:
   contents: read
 
 concurrency:
-  # Serialize runs of this workflow so they don't clobber each-other.
   group: probe-metrics-${{ github.ref }}
   cancel-in-progress: false
 
@@ -32,7 +31,7 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y jq unzip || true
 
-      - name: Restore previous probe-metrics artifact (if any)
+      - name: Restore previous probe-metrics artifact (robust lookup)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -42,13 +41,40 @@ jobs:
           set -euo pipefail
           mkdir -p metrics
 
-          echo "Looking for recent completed runs of workflow file: $WORKFLOW_FILE"
-          # Request several recent completed runs (no invalid 'status=success' param)
-          runs_api="https://api.github.com/repos/$REPO/actions/workflows/$WORKFLOW_FILE/runs?per_page=10&status=completed"
+          echo "Listing workflows for repository $REPO to find the workflow id for $WORKFLOW_FILE"
+          workflows_api="https://api.github.com/repos/$REPO/actions/workflows?per_page=100"
+          workflows_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$workflows_api")
+          echo "workflows_json: $workflows_json" >&2
+
+          # Try to find a workflow whose path ends with the filename (handles .github/workflows/<file>)
+          workflow_id=$(echo "$workflows_json" | jq -r --arg wf "$WORKFLOW_FILE" '.workflows[] | select(.path | endswith($wf)) | .id // empty' | head -n1)
+
+          # If not found, try matching by name exactly as a fallback (less reliable)
+          if [ -z "$workflow_id" ]; then
+            workflow_id=$(echo "$workflows_json" | jq -r --arg wf "$WORKFLOW_FILE" '.workflows[] | select(.name == $wf) | .id // empty' | head -n1)
+          fi
+
+          if [ -z "$workflow_id" ]; then
+            echo "Could not find workflow matching '$WORKFLOW_FILE' in repository $REPO."
+            echo "Check that the workflow file exists at .github/workflows/$WORKFLOW_FILE on the default branch,"
+            echo "that the filename matches exactly (case and extension), and that the GITHUB_TOKEN has actions:read."
+            # Print available workflow paths to help debugging
+            echo "Available workflow paths:"
+            echo "$workflows_json" | jq -r '.workflows[].path' || true
+            # Fall back to creating an initial CSV so the run can continue
+            if [ ! -f metrics/metrics.csv ]; then
+              echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
+            fi
+            exit 0
+          fi
+
+          echo "Found workflow id: $workflow_id for file $WORKFLOW_FILE"
+
+          echo "Looking for recent completed runs for workflow id $workflow_id"
+          runs_api="https://api.github.com/repos/$REPO/actions/workflows/$workflow_id/runs?per_page=20&status=completed"
           runs_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$runs_api")
           echo "runs_json: $runs_json" >&2
 
-          # Iterate runs until we find an artifact named $ARTIFACT_NAME
           run_ids=$(echo "$runs_json" | jq -r '.workflow_runs[].id // empty')
           found_artifact=""
           for rid in $run_ids; do
@@ -73,7 +99,7 @@ jobs:
             exit 0
           fi
 
-          # Download and extract the artifact
+          echo "Downloading artifact id $found_artifact..."
           artifact_zip_url="https://api.github.com/repos/$REPO/actions/artifacts/$found_artifact/zip"
           curl -sL -H "Authorization: token $GITHUB_TOKEN" -o previous_artifact.zip "$artifact_zip_url"
 
@@ -91,9 +117,6 @@ jobs:
               echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
             fi
           fi
-
-      - name: Ensure metrics directory exists
-        run: mkdir -p ./metrics
 
       - name: Run metrics.js (update metrics/metrics.csv)
         env:
