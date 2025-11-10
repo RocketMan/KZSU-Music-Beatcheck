@@ -18,12 +18,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Download previous metrics artifact
-        uses: actions/download-artifact@v4
+      - name: Restore metrics cache
+        uses: actions/cache@v4
         with:
-          name: probe-metrics
           path: ./metrics
-        continue-on-error: true
+          key: probe-metrics-cache
 
       - name: Install dependencies
         run: npm install node-fetch
@@ -35,9 +34,9 @@ jobs:
           mkdir -p ./metrics
           node scripts/metrics.js
 
-      - name: Upload updated metrics artifact
-        uses: actions/upload-artifact@v4
+      - name: Save metrics cache
+        uses: actions/cache@v4
         with:
-          name: probe-metrics
-          path: ./metrics/metrics.csv
+          path: ./metrics
+          key: probe-metrics-cache
 
