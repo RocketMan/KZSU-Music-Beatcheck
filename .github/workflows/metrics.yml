@@ -33,3 +33,9 @@ jobs:
         run: |
           mkdir -p ./metrics
           node scripts/metrics.js
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: probe-metrics
+          path: ./metrics/metrics.csv
