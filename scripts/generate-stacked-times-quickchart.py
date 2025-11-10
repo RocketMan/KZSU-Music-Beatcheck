@@ -10,15 +10,6 @@ Generate a stacked-bar response-times chart using QuickChart (no local chart dep
 
 Usage:
   python3 scripts/generate-stacked-times-quickchart.py --points 500 --out-png metrics/stacked-times-quickchart.png --out-html metrics/stacked-times-quickchart.html
-
-Options:
-  --csv      path to csv (default: metrics/metrics.csv)
-  --points   max runs to include (default: auto from days/interval)
-  --days     days to consider (default: 7)
-  --interval minutes between runs (default: 5)
-  --out-png  path for PNG output
-  --out-html path for interactive HTML output
-  --quickchart-url override QuickChart endpoint (default https://quickchart.io)
 """
 import csv
 import json
@@ -81,10 +72,7 @@ def build_chart_config(labels, datasets, title):
           "legend": { "position": "bottom" },
           "tooltip": {
             "mode": "index",
-            "intersect": False,
-            "callbacks": {
-              # tooltip label formatting is handled client-side in HTML; QuickChart will also render sensible labels
-            }
+            "intersect": False
           }
         },
         "scales": {
@@ -197,10 +185,10 @@ def main():
     slice_records = records[-points:]
     labels = [r[0] for r in slice_records]
 
-    # build datasets: one dataset per timing column (ms)
+    # build all datasets (including total if present)
     cols = [h for i,h in timing_cols]
     colors = choose_colors(len(cols))
-    datasets = []
+    all_datasets = []
     for idx,col in enumerate(cols):
         data = [r[1].get(col, 0) for r in slice_records]
         ds = {
@@ -211,16 +199,36 @@ def main():
             "borderWidth": 0.5,
             "borderColor": "#222"
         }
-        datasets.append(ds)
+        all_datasets.append(ds)
 
-    # move totalTime to the end so stack equals sum of parts if present
-    total_idx = next((i for i,d in enumerate(datasets) if "total" in d["label"].lower()), None)
+    # Separate the total dataset (case-insensitive 'total' in label), exclude it from stacked bars
+    total_idx = next((i for i,d in enumerate(all_datasets) if "total" in d["label"].lower()), None)
+    total_dataset = None
     if total_idx is not None:
-        total_ds = datasets.pop(total_idx)
-        datasets.append(total_ds)
+        td = all_datasets.pop(total_idx)
+        # make an overlaid line dataset for total
+        total_dataset = {
+            "label": td["label"],
+            "data": td["data"],
+            "type": "line",
+            "borderColor": "#d62728",
+            "backgroundColor": "rgba(214,39,40,0.12)",
+            "borderWidth": 2.5,
+            "pointRadius": 2,
+            "fill": False,
+            # don't set 'stack' so it won't participate in stacking
+        }
+
+    # Use remaining datasets as stacked bar slices
+    stacked_datasets = all_datasets
+
+    # final datasets to render: stacked bars first, then optional total line
+    render_datasets = list(stacked_datasets)
+    if total_dataset is not None:
+        render_datasets.append(total_dataset)
 
     title = f"Per-run elapsed times (stacked) — last {points} runs — unit: ms"
-    chart_config = build_chart_config(labels, datasets, title)
+    chart_config = build_chart_config(labels, render_datasets, title)
 
     # generate PNG via QuickChart
     print("Posting chart config to QuickChart...")
