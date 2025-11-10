@@ -23,6 +23,7 @@ jobs:
         with:
           name: probe-metrics
           path: ./metrics
+        continue-on-error: true
 
       - name: Install dependencies
         run: npm install node-fetch
