@@ -1,0 +1,274 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Per-run elapsed times (stacked) — last 12 runs — unit: ms</title>
+  <style>body{font-family:Arial,Helvetica,sans-serif;padding:16px}canvas{max-width:100%;height:auto}</style>
+</head>
+<body>
+  <h2>Per-run elapsed times (stacked) — last 12 runs — unit: ms</h2>
+  <div><button id="resetZoom">Reset zoom</button> <small>Drag to zoom / scroll to zoom / right-drag to pan</small></div>
+  <canvas id="chart" width="1400" height="700"></canvas>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <script>
+    const cfg = {
+  "type": "bar",
+  "data": {
+    "labels": [
+      "2025-11-10T15:44:58.178000+00:00",
+      "2025-11-10T15:46:00.331000+00:00",
+      "2025-11-10T15:48:23.629000+00:00",
+      "2025-11-10T15:57:40.665000+00:00",
+      "2025-11-10T16:08:28.112000+00:00",
+      "2025-11-10T16:37:04.109000+00:00",
+      "2025-11-10T16:56:48.985000+00:00",
+      "2025-11-10T17:25:49.645000+00:00",
+      "2025-11-10T17:41:57.033000+00:00",
+      "2025-11-10T17:55:26.033000+00:00",
+      "2025-11-10T18:37:45.168000+00:00",
+      "2025-11-10T18:53:23.522000+00:00"
+    ],
+    "datasets": [
+      {
+        "label": "findTime",
+        "data": [
+          315.72,
+          314.27,
+          407.62,
+          478.1,
+          290.56,
+          398.95,
+          380.92,
+          343.35,
+          195.34,
+          366.4,
+          765.28,
+          319.06
+        ],
+        "backgroundColor": "#1f77b4",
+        "stack": "stack1",
+        "borderWidth": 0.5,
+        "borderColor": "#222"
+      },
+      {
+        "label": "createTime",
+        "data": [
+          0.0,
+          0.0,
+          85.21,
+          89.62,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "backgroundColor": "#ff7f0e",
+        "stack": "stack1",
+        "borderWidth": 0.5,
+        "borderColor": "#222"
+      },
+      {
+        "label": "commentTime",
+        "data": [
+          60.27,
+          61.4,
+          252.36,
+          250.65,
+          34.42,
+          85.33,
+          60.26,
+          71.81,
+          32.41,
+          61.33,
+          95.11,
+          46.61
+        ],
+        "backgroundColor": "#2ca02c",
+        "stack": "stack1",
+        "borderWidth": 0.5,
+        "borderColor": "#222"
+      },
+      {
+        "label": "spinTime",
+        "data": [
+          58.55,
+          58.89,
+          87.71,
+          88.05,
+          28.82,
+          83.73,
+          58.79,
+          69.66,
+          29.12,
+          57.9,
+          92.13,
+          44.87
+        ],
+        "backgroundColor": "#d62728",
+        "stack": "stack1",
+        "borderWidth": 0.5,
+        "borderColor": "#222"
+      },
+      {
+        "label": "moveTime",
+        "data": [
+          57.41,
+          59.88,
+          84.76,
+          87.39,
+          29.07,
+          83.41,
+          58.91,
+          68.79,
+          30.93,
+          58.57,
+          93.69,
+          44.23
+        ],
+        "backgroundColor": "#9467bd",
+        "stack": "stack1",
+        "borderWidth": 0.5,
+        "borderColor": "#222"
+      },
+      {
+        "label": "viewTime",
+        "data": [
+          184.28,
+          189.71,
+          96.66,
+          92.58,
+          85.47,
+          253.68,
+          184.86,
+          192.68,
+          83.74,
+          190.89,
+          270.89,
+          136.87
+        ],
+        "backgroundColor": "#8c564b",
+        "stack": "stack1",
+        "borderWidth": 0.5,
+        "borderColor": "#222"
+      },
+      {
+        "label": "deleteCommentTime",
+        "data": [
+          61.79,
+          58.86,
+          83.57,
+          89.01,
+          30.4,
+          85.12,
+          59.0,
+          70.73,
+          30.9,
+          60.35,
+          94.06,
+          44.92
+        ],
+        "backgroundColor": "#e377c2",
+        "stack": "stack1",
+        "borderWidth": 0.5,
+        "borderColor": "#222"
+      },
+      {
+        "label": "deleteSpinTime",
+        "data": [
+          57.75,
+          58.52,
+          85.68,
+          82.38,
+          28.9,
+          82.28,
+          58.19,
+          64.74,
+          28.05,
+          60.51,
+          92.31,
+          42.91
+        ],
+        "backgroundColor": "#7f7f7f",
+        "stack": "stack1",
+        "borderWidth": 0.5,
+        "borderColor": "#222"
+      },
+      {
+        "label": "totalTime",
+        "data": [
+          795.77,
+          801.53,
+          1183.57,
+          1257.78,
+          527.64,
+          1072.5,
+          860.92,
+          881.77,
+          430.48,
+          855.95,
+          1503.47,
+          679.46
+        ],
+        "backgroundColor": "#bcbd22",
+        "stack": "stack1",
+        "borderWidth": 0.5,
+        "borderColor": "#222"
+      }
+    ]
+  },
+  "options": {
+    "responsive": false,
+    "plugins": {
+      "title": {
+        "display": true,
+        "text": "Per-run elapsed times (stacked) \u2014 last 12 runs \u2014 unit: ms"
+      },
+      "legend": {
+        "position": "bottom"
+      },
+      "tooltip": {
+        "mode": "index",
+        "intersect": false,
+        "callbacks": {}
+      }
+    },
+    "scales": {
+      "x": {
+        "stacked": true,
+        "ticks": {
+          "maxRotation": 45,
+          "autoSkip": true,
+          "maxTicksLimit": 20
+        },
+        "title": {
+          "display": true,
+          "text": "Run timestamp (UTC)"
+        }
+      },
+      "y": {
+        "stacked": true,
+        "beginAtZero": true,
+        "title": {
+          "display": true,
+          "text": "Elapsed time (ms)"
+        }
+      }
+    },
+    "interaction": {
+      "mode": "nearest",
+      "intersect": false
+    }
+  }
+};
+    Chart.register(ChartZoom);
+    const ctx = document.getElementById('chart').getContext('2d');
+    const chart = new Chart(ctx, cfg);
+    document.getElementById('resetZoom').addEventListener('click', () => chart.resetZoom());
+  </script>
+</body>
+</html>
