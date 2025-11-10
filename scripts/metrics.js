@@ -75,7 +75,7 @@ async function safeText(res) {
             type: "show",
             attributes: {
               name: TEST_NAME,
-              date: "2020-01-01",
+              date: "2012-01-01",
               time: "1200-1400",
               airname: TEST_AIRNAME
             }
