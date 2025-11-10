@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Restore metrics cache
+      - name: Access metrics cache
         uses: actions/cache@v4
         with:
           path: ./metrics
@@ -33,10 +33,3 @@ jobs:
         run: |
           mkdir -p ./metrics
           node scripts/metrics.js
-
-      - name: Save metrics cache
-        uses: actions/cache@v4
-        with:
-          path: ./metrics
-          key: probe-metrics-cache
-
