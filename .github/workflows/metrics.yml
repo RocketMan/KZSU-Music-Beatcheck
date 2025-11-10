@@ -5,6 +5,10 @@ on:
     - cron: '*/5 * * * *' # Every 5 minutes
   workflow_dispatch:
 
+permissions:
+  actions: read
+  contents: read
+
 concurrency:
   # Serialize runs of this workflow so they don't clobber each-other.
   group: probe-metrics-${{ github.ref }}
@@ -30,49 +34,51 @@ jobs:
 
       - name: Restore previous probe-metrics artifact (if any)
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           WORKFLOW_FILE: probe-metrics-logger.yml
           ARTIFACT_NAME: probe-metrics
         run: |
           set -euo pipefail
-
           mkdir -p metrics
 
-          echo "Looking for latest successful run of workflow file: $WORKFLOW_FILE"
-          runs_api="https://api.github.com/repos/$REPO/actions/workflows/$WORKFLOW_FILE/runs?per_page=1&status=success"
-
+          echo "Looking for recent completed runs of workflow file: $WORKFLOW_FILE"
+          # Request several recent completed runs (no invalid 'status=success' param)
+          runs_api="https://api.github.com/repos/$REPO/actions/workflows/$WORKFLOW_FILE/runs?per_page=10&status=completed"
           runs_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$runs_api")
-          run_id=$(echo "$runs_json" | jq -r '.workflow_runs[0].id // empty')
+          echo "runs_json: $runs_json" >&2
 
-          if [ -z "$run_id" ]; then
-            echo "No previous successful run found. Creating metrics/metrics.csv with header (if you want headers)."
+          # Iterate runs until we find an artifact named $ARTIFACT_NAME
+          run_ids=$(echo "$runs_json" | jq -r '.workflow_runs[].id // empty')
+          found_artifact=""
+          for rid in $run_ids; do
+            echo "Checking run id: $rid" >&2
+            artifacts_api="https://api.github.com/repos/$REPO/actions/runs/$rid/artifacts"
+            artifacts_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$artifacts_api")
+            echo "artifacts_json for run $rid: $artifacts_json" >&2
+
+            artifact_id=$(echo "$artifacts_json" | jq -r --arg name "$ARTIFACT_NAME" '.artifacts[] | select(.name == $name) | .id // empty')
+            if [ -n "$artifact_id" ]; then
+              echo "Found artifact $ARTIFACT_NAME in run $rid -> id $artifact_id"
+              found_artifact="$artifact_id"
+              break
+            fi
+          done
+
+          if [ -z "$found_artifact" ]; then
+            echo "No previous artifact found. Creating metrics/metrics.csv with header (if you want headers)."
             if [ ! -f metrics/metrics.csv ]; then
               echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
             fi
             exit 0
           fi
 
-          echo "Found previous run id: $run_id. Checking artifacts for name: $ARTIFACT_NAME"
-          artifacts_api="https://api.github.com/repos/$REPO/actions/runs/$run_id/artifacts"
-          artifacts_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$artifacts_api")
-
-          artifact_id=$(echo "$artifacts_json" | jq -r --arg name "$ARTIFACT_NAME" '.artifacts[] | select(.name == $name) | .id // empty')
-          if [ -z "$artifact_id" ]; then
-            echo "No artifact named $ARTIFACT_NAME found in run $run_id. Creating new metrics/metrics.csv if missing."
-            if [ ! -f metrics/metrics.csv ]; then
-              echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
-            fi
-            exit 0
-          fi
-
-          echo "Downloading artifact id $artifact_id..."
-          artifact_zip_url="https://api.github.com/repos/$REPO/actions/artifacts/$artifact_id/zip"
+          # Download and extract the artifact
+          artifact_zip_url="https://api.github.com/repos/$REPO/actions/artifacts/$found_artifact/zip"
           curl -sL -H "Authorization: token $GITHUB_TOKEN" -o previous_artifact.zip "$artifact_zip_url"
 
           unzip -o previous_artifact.zip -d previous_artifact >/dev/null || true
 
-          # Try a few likely paths inside the artifact
           if [ -f previous_artifact/metrics/metrics.csv ]; then
             cp previous_artifact/metrics/metrics.csv metrics/metrics.csv
             echo "Restored previous metrics/metrics.csv."
@@ -86,11 +92,6 @@ jobs:
             fi
           fi
 
-      - name: Install dependencies (optional)
-        run: |
-          # If you have project dependencies, install them; otherwise this is a no-op.
-          npm ci || true
-
       - name: Ensure metrics directory exists
         run: mkdir -p ./metrics
 
@@ -98,7 +99,6 @@ jobs:
         env:
           APIKEY: ${{ secrets.APIKEY }}
         run: |
-          # Node 20 provides global fetch so we don't need node-fetch.
           node scripts/metrics.js
 
       - name: Show tail of metrics/metrics.csv
@@ -113,4 +113,3 @@ jobs:
           name: probe-metrics
           path: |
             metrics/metrics.csv
-
