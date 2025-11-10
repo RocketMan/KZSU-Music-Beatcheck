@@ -1,0 +1,156 @@
+name: Generate Probe Charts (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      chart:
+        description: 'chart type: stacked or response'
+        required: true
+        default: 'stacked'
+      days:
+        description: 'how many days back to include (used to estimate points)'
+        required: false
+        default: '7'
+      points:
+        description: 'max number of runs to include (0 = auto)'
+        required: false
+        default: '0'
+      publish:
+        description: 'publish outputs to gh-pages branch? (true/false)'
+        required: false
+        default: 'false'
+
+permissions:
+  actions: read
+  contents: write   # needed if pushing to gh-pages
+  contents: read
+
+env:
+  LOOKBACK_RUNS: "20"          # how many completed workflow runs to inspect for artifacts
+  WORKFLOW_FILE: "probe-metrics-logger.yml"
+  ARTIFACT_NAME: "probe-metrics"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare runtime
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq unzip python3 || true
+
+      - name: Restore metrics artifact (look back runs)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          WORKFLOW_FILE: ${{ env.WORKFLOW_FILE }}
+          ARTIFACT_NAME: ${{ env.ARTIFACT_NAME }}
+          LOOKBACK: ${{ env.LOOKBACK_RUNS }}
+        run: |
+          set -euo pipefail
+          mkdir -p metrics previous_artifact
+          # find workflow id
+          workflows_api="https://api.github.com/repos/$REPO/actions/workflows?per_page=100"
+          workflows_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$workflows_api")
+          workflow_id=$(echo "$workflows_json" | jq -r --arg wf "$WORKFLOW_FILE" '.workflows[] | select(.path | endswith($wf)) | .id // empty' | head -n1)
+          if [ -z "$workflow_id" ]; then
+            workflow_id=$(echo "$workflows_json" | jq -r --arg wf "$WORKFLOW_FILE" '.workflows[] | select(.name == $wf) | .id // empty' | head -n1)
+          fi
+          if [ -z "$workflow_id" ]; then
+            echo "Could not find workflow $WORKFLOW_FILE; creating an empty metrics CSV so chart job can run."
+            if [ ! -f metrics/metrics.csv ]; then
+              echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
+            fi
+            exit 0
+          fi
+
+          runs_api="https://api.github.com/repos/$REPO/actions/workflows/$workflow_id/runs?per_page=$LOOKBACK&status=completed"
+          runs_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$runs_api")
+          run_ids=$(echo "$runs_json" | jq -r '.workflow_runs[].id // empty')
+
+          found_artifact=""
+          for rid in $run_ids; do
+            artifacts_api="https://api.github.com/repos/$REPO/actions/runs/$rid/artifacts"
+            artifacts_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$artifacts_api")
+            artifact_id=$(echo "$artifacts_json" | jq -r --arg name "$ARTIFACT_NAME" '.artifacts[] | select(.name == $name) | .id // empty')
+            if [ -n "$artifact_id" ]; then
+              found_artifact="$artifact_id"
+              break
+            fi
+          done
+
+          if [ -z "$found_artifact" ]; then
+            echo "No previous artifact found in last $LOOKBACK runs. Creating starter CSV."
+            if [ ! -f metrics/metrics.csv ]; then
+              echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
+            fi
+            exit 0
+          fi
+
+          echo "Downloading artifact id $found_artifact..."
+          artifact_zip_url="https://api.github.com/repos/$REPO/actions/artifacts/$found_artifact/zip"
+          curl -sL -H "Authorization: token $GITHUB_TOKEN" -o previous_artifact.zip "$artifact_zip_url"
+          unzip -o previous_artifact.zip -d previous_artifact >/dev/null || true
+
+          if [ -f previous_artifact/metrics/metrics.csv ]; then
+            cp previous_artifact/metrics/metrics.csv metrics/metrics.csv
+            echo "Restored previous metrics/metrics.csv."
+          elif [ -f previous_artifact/metrics.csv ]; then
+            cp previous_artifact/metrics.csv metrics/metrics.csv
+            echo "Restored previous metrics.csv."
+          else
+            echo "Artifact did not contain metrics/metrics.csv; creating new metrics/metrics.csv"
+            if [ ! -f metrics/metrics.csv ]; then
+              echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
+            fi
+          fi
+
+      - name: Generate chart (QuickChart Python script)
+        # expects scripts/generate-stacked-times-quickchart.py or response-times variant in scripts/
+        run: |
+          CHART="${{ github.event.inputs.chart }}"
+          DAYS="${{ github.event.inputs.days }}"
+          POINTS="${{ github.event.inputs.points }}"
+          if [ "$CHART" = "stacked" ]; then
+            python3 scripts/generate-stacked-times-quickchart.py --points ${POINTS} --days ${DAYS} --out-png metrics/stacked-times-quickchart.png --out-html metrics/stacked-times-quickchart.html
+          else
+            python3 scripts/generate-response-times-graph.py --points ${POINTS} --days ${DAYS} --unit ms --out metrics/response-times-quickchart.png
+          fi
+
+      - name: Upload chart artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-charts
+          path: |
+            metrics/*.png
+            metrics/*.html
+
+      - name: Publish to gh-pages (optional)
+        if: ${{ github.event.inputs.publish == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git checkout --force -B gh-pages origin/gh-pages
+          else
+            git checkout --force -B gh-pages
+          fi
+          mkdir -p assets/metrics
+          cp metrics/*.png assets/metrics/ || true
+          cp metrics/*.html assets/metrics/ || true
+          git add assets/metrics || true
+          if git diff --cached --quiet; then
+            echo "No changes to charts; skipping commit"
+          else
+            git commit -m "Update generated charts (manual run $GITHUB_RUN_ID)"
+            git push origin gh-pages --force
+          fi
