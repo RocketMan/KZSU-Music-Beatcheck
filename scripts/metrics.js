@@ -10,7 +10,7 @@ const TEST_NAME = "TEST Show";
 const TEST_AIRNAME = "KZSU Music Beatcheck";
 const API_KEY = process.env.APIKEY;
 
-const logPath = path.join(__dirname, "metrics.csv");
+const logPath = path.join(__dirname, "..", "metrics", "metrics.csv");
 let paginateSeq = 1;
 
 function paginateUrl(url) {
