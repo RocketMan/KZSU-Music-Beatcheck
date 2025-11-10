@@ -2,7 +2,7 @@ name: Probe Metrics Logger
 
 on:
   schedule:
-    - cron: '*/5 * * * *' # Every 5 minutes
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -12,6 +12,11 @@ permissions:
 concurrency:
   group: probe-metrics-${{ github.ref }}
   cancel-in-progress: false
+
+env:
+  LOOKBACK_RUNS: "10"
+  ARTIFACT_NAME: "probe-metrics"
+  WORKFLOW_FILE: "probe-metrics-logger.yml"
 
 jobs:
   log-metrics:
@@ -31,68 +36,58 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y jq unzip || true
 
-      - name: Restore previous probe-metrics artifact (robust lookup)
+      - name: Restore previous probe-metrics artifact
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          WORKFLOW_FILE: probe-metrics-logger.yml
-          ARTIFACT_NAME: probe-metrics
         run: |
           set -euo pipefail
           mkdir -p metrics
 
-          echo "Listing workflows for repository $REPO to find the workflow id for $WORKFLOW_FILE"
+          LOOKBACK=${LOOKBACK_RUNS:-10}
+          WF_FILE=${WORKFLOW_FILE:-probe-metrics-logger.yml}
+          ART_NAME=${ARTIFACT_NAME:-probe-metrics}
+          echo "Looking up workflow id for $WF_FILE in $REPO"
+
           workflows_api="https://api.github.com/repos/$REPO/actions/workflows?per_page=100"
           workflows_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$workflows_api")
-          echo "workflows_json: $workflows_json" >&2
+          workflow_id=$(echo "$workflows_json" | jq -r --arg wf "$WF_FILE" '.workflows[] | select(.path | endswith($wf)) | .id // empty' | head -n1)
 
-          # Try to find a workflow whose path ends with the filename (handles .github/workflows/<file>)
-          workflow_id=$(echo "$workflows_json" | jq -r --arg wf "$WORKFLOW_FILE" '.workflows[] | select(.path | endswith($wf)) | .id // empty' | head -n1)
-
-          # If not found, try matching by name exactly as a fallback (less reliable)
           if [ -z "$workflow_id" ]; then
-            workflow_id=$(echo "$workflows_json" | jq -r --arg wf "$WORKFLOW_FILE" '.workflows[] | select(.name == $wf) | .id // empty' | head -n1)
+            # fallback: try exact name match
+            workflow_id=$(echo "$workflows_json" | jq -r --arg wf "$WF_FILE" '.workflows[] | select(.name == $wf) | .id // empty' | head -n1)
           fi
 
           if [ -z "$workflow_id" ]; then
-            echo "Could not find workflow matching '$WORKFLOW_FILE' in repository $REPO."
-            echo "Check that the workflow file exists at .github/workflows/$WORKFLOW_FILE on the default branch,"
-            echo "that the filename matches exactly (case and extension), and that the GITHUB_TOKEN has actions:read."
-            # Print available workflow paths to help debugging
-            echo "Available workflow paths:"
+            echo "Could not find workflow file $WF_FILE. Available workflow paths:"
             echo "$workflows_json" | jq -r '.workflows[].path' || true
-            # Fall back to creating an initial CSV so the run can continue
             if [ ! -f metrics/metrics.csv ]; then
               echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
             fi
             exit 0
           fi
 
-          echo "Found workflow id: $workflow_id for file $WORKFLOW_FILE"
+          echo "Found workflow id: $workflow_id. Looking back up to $LOOKBACK runs for artifact: $ART_NAME"
 
-          echo "Looking for recent completed runs for workflow id $workflow_id"
-          runs_api="https://api.github.com/repos/$REPO/actions/workflows/$workflow_id/runs?per_page=20&status=completed"
+          runs_api="https://api.github.com/repos/$REPO/actions/workflows/$workflow_id/runs?per_page=$LOOKBACK&status=completed"
           runs_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$runs_api")
-          echo "runs_json: $runs_json" >&2
-
           run_ids=$(echo "$runs_json" | jq -r '.workflow_runs[].id // empty')
+
           found_artifact=""
           for rid in $run_ids; do
-            echo "Checking run id: $rid" >&2
+            echo "Checking run id: $rid"
             artifacts_api="https://api.github.com/repos/$REPO/actions/runs/$rid/artifacts"
             artifacts_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$artifacts_api")
-            echo "artifacts_json for run $rid: $artifacts_json" >&2
-
-            artifact_id=$(echo "$artifacts_json" | jq -r --arg name "$ARTIFACT_NAME" '.artifacts[] | select(.name == $name) | .id // empty')
+            artifact_id=$(echo "$artifacts_json" | jq -r --arg name "$ART_NAME" '.artifacts[] | select(.name == $name) | .id // empty')
             if [ -n "$artifact_id" ]; then
-              echo "Found artifact $ARTIFACT_NAME in run $rid -> id $artifact_id"
+              echo "Found artifact $ART_NAME in run $rid -> id $artifact_id"
               found_artifact="$artifact_id"
               break
             fi
           done
 
           if [ -z "$found_artifact" ]; then
-            echo "No previous artifact found. Creating metrics/metrics.csv with header (if you want headers)."
+            echo "No artifact named $ART_NAME found in the last $LOOKBACK runs. Creating fresh metrics/metrics.csv with header."
             if [ ! -f metrics/metrics.csv ]; then
               echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
             fi
@@ -118,6 +113,9 @@ jobs:
             fi
           fi
 
+      - name: Ensure metrics directory exists
+        run: mkdir -p ./metrics
+
       - name: Run metrics.js (update metrics/metrics.csv)
         env:
           APIKEY: ${{ secrets.APIKEY }}
@@ -134,5 +132,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: probe-metrics
-          path: |
-            metrics/metrics.csv
+          path: metrics/metrics.csv
