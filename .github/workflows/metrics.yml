@@ -5,6 +5,11 @@ on:
     - cron: '*/5 * * * *' # Every 5 minutes
   workflow_dispatch:
 
+concurrency:
+  # Serialize runs of this workflow so they don't clobber each-other.
+  group: probe-metrics-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   log-metrics:
     runs-on: ubuntu-latest
@@ -18,34 +23,94 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Restore metrics cache
-        id: cache-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: ./metrics
-          key: probe-metrics
-          restore-keys: |
-            probe-metrics
+      - name: Prepare tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq unzip || true
 
-      - name: Install dependencies
-        run: npm install node-fetch
+      - name: Restore previous probe-metrics artifact (if any)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          REPO: ${{ github.repository }}
+          WORKFLOW_FILE: probe-metrics-logger.yml
+          ARTIFACT_NAME: probe-metrics
+        run: |
+          set -euo pipefail
 
-      - name: Run metrics.js
+          mkdir -p metrics
+
+          echo "Looking for latest successful run of workflow file: $WORKFLOW_FILE"
+          runs_api="https://api.github.com/repos/$REPO/actions/workflows/$WORKFLOW_FILE/runs?per_page=1&status=success"
+
+          runs_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$runs_api")
+          run_id=$(echo "$runs_json" | jq -r '.workflow_runs[0].id // empty')
+
+          if [ -z "$run_id" ]; then
+            echo "No previous successful run found. Creating metrics/metrics.csv with header (if you want headers)."
+            if [ ! -f metrics/metrics.csv ]; then
+              echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
+            fi
+            exit 0
+          fi
+
+          echo "Found previous run id: $run_id. Checking artifacts for name: $ARTIFACT_NAME"
+          artifacts_api="https://api.github.com/repos/$REPO/actions/runs/$run_id/artifacts"
+          artifacts_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$artifacts_api")
+
+          artifact_id=$(echo "$artifacts_json" | jq -r --arg name "$ARTIFACT_NAME" '.artifacts[] | select(.name == $name) | .id // empty')
+          if [ -z "$artifact_id" ]; then
+            echo "No artifact named $ARTIFACT_NAME found in run $run_id. Creating new metrics/metrics.csv if missing."
+            if [ ! -f metrics/metrics.csv ]; then
+              echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
+            fi
+            exit 0
+          fi
+
+          echo "Downloading artifact id $artifact_id..."
+          artifact_zip_url="https://api.github.com/repos/$REPO/actions/artifacts/$artifact_id/zip"
+          curl -sL -H "Authorization: token $GITHUB_TOKEN" -o previous_artifact.zip "$artifact_zip_url"
+
+          unzip -o previous_artifact.zip -d previous_artifact >/dev/null || true
+
+          # Try a few likely paths inside the artifact
+          if [ -f previous_artifact/metrics/metrics.csv ]; then
+            cp previous_artifact/metrics/metrics.csv metrics/metrics.csv
+            echo "Restored previous metrics/metrics.csv."
+          elif [ -f previous_artifact/metrics.csv ]; then
+            cp previous_artifact/metrics.csv metrics/metrics.csv
+            echo "Restored previous metrics.csv."
+          else
+            echo "Artifact did not contain metrics/metrics.csv; creating new metrics/metrics.csv"
+            if [ ! -f metrics/metrics.csv ]; then
+              echo "timestamp,findTime,createTime,commentTime,spinTime,moveTime,viewTime,deleteCommentTime,deleteSpinTime,totalTime" > metrics/metrics.csv
+            fi
+          fi
+
+      - name: Install dependencies (optional)
+        run: |
+          # If you have project dependencies, install them; otherwise this is a no-op.
+          npm ci || true
+
+      - name: Ensure metrics directory exists
+        run: mkdir -p ./metrics
+
+      - name: Run metrics.js (update metrics/metrics.csv)
         env:
           APIKEY: ${{ secrets.APIKEY }}
         run: |
-          mkdir -p ./metrics
+          # Node 20 provides global fetch so we don't need node-fetch.
           node scripts/metrics.js
 
-      - name: Save metrics cache
-        uses: actions/cache/save@v4
-        with:
-          path: ./metrics
-          key: probe-metrics-${{ github.run_id }}
+      - name: Show tail of metrics/metrics.csv
+        run: |
+          echo "---- tail of metrics/metrics.csv ----"
+          tail -n 30 metrics/metrics.csv || true
+          echo "-------------------------------------"
 
       - name: Upload updated metrics artifact
         uses: actions/upload-artifact@v4
         with:
           name: probe-metrics
-          path: ./metrics/metrics.csv
+          path: |
+            metrics/metrics.csv
 
