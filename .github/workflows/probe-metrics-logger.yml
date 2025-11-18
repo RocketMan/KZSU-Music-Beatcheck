@@ -133,3 +133,13 @@ jobs:
         with:
           name: probe-metrics
           path: metrics/metrics.csv
+
+      - name: Cleanup duplicate artifacts (keep newest)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          ARTIFACT_NAME: probe-metrics
+        run: |
+          chmod +x scripts/cleanup-duplicate-artifacts.sh
+          scripts/cleanup-duplicate-artifacts.sh
