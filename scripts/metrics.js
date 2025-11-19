@@ -1,6 +1,7 @@
 const { performance } = require("perf_hooks");
 const fs = require("fs");
 const path = require("path");
+const fetchWithRetry = require("./fetch-with-retries");
 
 const BASE_URL = "https://zookeeper.stanford.edu/";
 const TEST_COMMENT = "TEST COMMENT";
@@ -24,9 +25,15 @@ async function safeText(res) {
   }
 }
 
+// Fetch defaults configurable via env
+const FETCH_OPTS = {
+  timeoutMs: Number(process.env.METRICS_FETCH_TIMEOUT_MS || process.env.FETCH_TIMEOUT_MS || 15000),
+  retries: Number(process.env.METRICS_FETCH_RETRIES || process.env.FETCH_RETRIES || 3),
+  backoffBase: Number(process.env.METRICS_FETCH_BACKOFF_BASE_MS || process.env.FETCH_BACKOFF_BASE_MS || 500),
+};
+
 (async () => {
   try {
-    // Ensure metrics directory exists
     fs.mkdirSync(path.dirname(logPath), { recursive: true });
 
     const timestamp = new Date().toISOString();
@@ -45,7 +52,8 @@ async function safeText(res) {
 
     // 1. Find Playlist
     let t0 = performance.now();
-    let res = await fetch(`${BASE_URL}api/v1/playlist?filter[user]=self&fields[show]=name`, {
+    let res = await fetchWithRetry(`${BASE_URL}api/v1/playlist?filter[user]=self&fields[show]=name`, {
+      ...FETCH_OPTS,
       method: "GET",
       headers: { "X-APIKEY": API_KEY }
     });
@@ -64,7 +72,8 @@ async function safeText(res) {
     } else {
       // 1b. Create Playlist
       t0 = performance.now();
-      res = await fetch(`${BASE_URL}api/v1/playlist`, {
+      res = await fetchWithRetry(`${BASE_URL}api/v1/playlist`, {
+        ...FETCH_OPTS,
         method: "POST",
         headers: {
           "Content-Type": "application/vnd.api+json",
@@ -95,7 +104,8 @@ async function safeText(res) {
 
     // 2. Insert Comment
     t0 = performance.now();
-    res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
+    res = await fetchWithRetry(`${BASE_URL}${paginateUrl(list)}/events`, {
+      ...FETCH_OPTS,
       method: "POST",
       headers: {
         "Content-Type": "application/vnd.api+json",
@@ -122,7 +132,8 @@ async function safeText(res) {
 
     // 3. Insert Spin
     t0 = performance.now();
-    res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
+    res = await fetchWithRetry(`${BASE_URL}${paginateUrl(list)}/events`, {
+      ...FETCH_OPTS,
       method: "POST",
       headers: {
         "Content-Type": "application/vnd.api+json",
@@ -152,7 +163,8 @@ async function safeText(res) {
 
     // 4. Move Track
     t0 = performance.now();
-    res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
+    res = await fetchWithRetry(`${BASE_URL}${paginateUrl(list)}/events`, {
+      ...FETCH_OPTS,
       method: "PATCH",
       headers: {
         "Content-Type": "application/vnd.api+json",
@@ -177,7 +189,8 @@ async function safeText(res) {
 
     // 5. View Playlist
     t0 = performance.now();
-    res = await fetch(`${BASE_URL}?action=&subaction=viewListById&playlist=${pid}`, {
+    res = await fetchWithRetry(`${BASE_URL}?action=&subaction=viewListById&playlist=${pid}`, {
+      ...FETCH_OPTS,
       method: "GET",
       headers: {
         "Accept": "text/html",
@@ -199,7 +212,8 @@ async function safeText(res) {
 
     // 6. Delete Comment
     t0 = performance.now();
-    res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
+    res = await fetchWithRetry(`${BASE_URL}${paginateUrl(list)}/events`, {
+      ...FETCH_OPTS,
       method: "DELETE",
       headers: {
         "Content-Type": "application/vnd.api+json",
@@ -221,7 +235,8 @@ async function safeText(res) {
 
     // 7. Delete Spin
     t0 = performance.now();
-    res = await fetch(`${BASE_URL}${paginateUrl(list)}/events`, {
+    res = await fetchWithRetry(`${BASE_URL}${paginateUrl(list)}/events`, {
+      ...FETCH_OPTS,
       method: "DELETE",
       headers: {
         "Content-Type": "application/vnd.api+json",
@@ -256,7 +271,6 @@ async function safeText(res) {
     console.log("Metrics appended:", row);
   } catch (err) {
     console.error("Script failed:", err && err.stack ? err.stack : err);
-    // Exit non-zero so the workflow run fails and you can inspect logs
     process.exit(1);
   }
 })();
