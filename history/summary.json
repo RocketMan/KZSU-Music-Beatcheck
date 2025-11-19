@@ -40,19 +40,19 @@
     "url": "https://kzsu-streams.stanford.edu/",
     "icon": "https://icons.duckduckgo.com/ip3/kzsu-streams.stanford.edu.ico",
     "slug": "kzsu-streams",
-    "status": "down",
-    "uptime": "100.00%",
-    "uptimeDay": "99.99%",
-    "uptimeWeek": "100.00%",
-    "uptimeMonth": "100.00%",
-    "uptimeYear": "100.00%",
-    "time": 225,
-    "timeDay": 203,
-    "timeWeek": 225,
-    "timeMonth": 225,
-    "timeYear": 225,
+    "status": "up",
+    "uptime": "99.89%",
+    "uptimeDay": "98.64%",
+    "uptimeWeek": "99.81%",
+    "uptimeMonth": "99.89%",
+    "uptimeYear": "99.89%",
+    "time": 223,
+    "timeDay": 191,
+    "timeWeek": 222,
+    "timeMonth": 223,
+    "timeYear": 223,
     "dailyMinutesDown": {
-      "2025-11-19": 0
+      "2025-11-19": 20
     }
   },
   {
