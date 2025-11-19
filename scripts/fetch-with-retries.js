@@ -14,7 +14,7 @@
  */
 
 const DEFAULT_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || 15000);
-const DEFAULT_RETRIES = Number(process.env.FETCH_RETRIES || 3); // total attempts = retries + 1
+const DEFAULT_RETRIES = Number(process.env.FETCH_RETRIES || 4); // increased default retries
 const DEFAULT_BACKOFF_BASE = Number(process.env.FETCH_BACKOFF_BASE_MS || 500); // ms base
 const MAX_RETRY_AFTER_SECS = Number(process.env.FETCH_MAX_RETRY_AFTER_SECS || 120);
 
@@ -24,11 +24,24 @@ function sleep(ms) {
 
 function isTransientError(err) {
   if (!err) return false;
+  // common Node-level network codes
   const transientCodes = new Set([
     "ECONNRESET", "ETIMEDOUT", "EAI_AGAIN", "ENOTFOUND", "EPIPE", "ECONNREFUSED"
   ]);
   if (err.code && transientCodes.has(err.code)) return true;
+
+  // undici / fetch error names
   if (err.name === "FetchError" || err.name === "AbortError") return true;
+
+  // undici sometimes throws TypeError: "fetch failed" (no code). Treat that as transient.
+  if (err.name === "TypeError" && typeof err.message === "string" && err.message.toLowerCase().includes("fetch failed")) return true;
+
+  // Also catch a few other common transient message patterns (socket hang up, TLS, handshake)
+  if (err.message && typeof err.message === "string") {
+    const m = err.message.toLowerCase();
+    if (m.includes("socket hang up") || m.includes("tls") || m.includes("handshake") || m.includes("unexpected end of file")) return true;
+  }
+
   return false;
 }
 
@@ -115,6 +128,7 @@ module.exports = async function fetchWithRetry(url, opts = {}) {
     } catch (err) {
       clearTimeout(timer);
       lastErr = err;
+      // Rich diagnostics
       console.error(`[fetch-with-retries] ${attemptTag} threw: name=${err && err.name} message=${err && err.message} code=${err && err.code || ""}`);
       if (err && err.stack) {
         const stackLines = (err.stack || "").split("\n").slice(0, 6).join("\n");
@@ -124,6 +138,7 @@ module.exports = async function fetchWithRetry(url, opts = {}) {
         console.warn(`[fetch-with-retries] ${attemptTag} aborted by timeout (${timeoutMs}ms)`);
       }
 
+      // Retry on transient errors (expanded to include undici TypeError "fetch failed" cases)
       if (isTransientError(err) && attempt <= retries) {
         const base = backoffBase * Math.pow(2, attempt - 1);
         const waitMs = jitter(base);
@@ -132,6 +147,7 @@ module.exports = async function fetchWithRetry(url, opts = {}) {
         continue;
       }
 
+      // unrecoverable or no retries left -> rethrow
       throw err;
     } finally {
       if (fetchOptions && fetchOptions.signal === signal) delete fetchOptions.signal;
