@@ -10,11 +10,11 @@
     "uptimeWeek": "100.00%",
     "uptimeMonth": "100.00%",
     "uptimeYear": "100.00%",
-    "time": 954,
-    "timeDay": 977,
-    "timeWeek": 922,
-    "timeMonth": 954,
-    "timeYear": 954,
+    "time": 946,
+    "timeDay": 874,
+    "timeWeek": 918,
+    "timeMonth": 946,
+    "timeYear": 946,
     "dailyMinutesDown": {}
   },
   {
@@ -28,11 +28,11 @@
     "uptimeWeek": "100.00%",
     "uptimeMonth": "100.00%",
     "uptimeYear": "100.00%",
-    "time": 286,
-    "timeDay": 350,
-    "timeWeek": 297,
-    "timeMonth": 286,
-    "timeYear": 286,
+    "time": 282,
+    "timeDay": 252,
+    "timeWeek": 289,
+    "timeMonth": 282,
+    "timeYear": 282,
     "dailyMinutesDown": {}
   },
   {
@@ -40,18 +40,20 @@
     "url": "https://kzsu-streams.stanford.edu/",
     "icon": "https://icons.duckduckgo.com/ip3/kzsu-streams.stanford.edu.ico",
     "slug": "kzsu-streams",
-    "status": "up",
+    "status": "down",
     "uptime": "100.00%",
-    "uptimeDay": "100.00%",
+    "uptimeDay": "99.99%",
     "uptimeWeek": "100.00%",
     "uptimeMonth": "100.00%",
     "uptimeYear": "100.00%",
-    "time": 228,
-    "timeDay": 268,
-    "timeWeek": 231,
-    "timeMonth": 228,
-    "timeYear": 228,
-    "dailyMinutesDown": {}
+    "time": 225,
+    "timeDay": 203,
+    "timeWeek": 225,
+    "timeMonth": 225,
+    "timeYear": 225,
+    "dailyMinutesDown": {
+      "2025-11-19": 0
+    }
   },
   {
     "name": "KZSU Zootopia",
@@ -64,11 +66,11 @@
     "uptimeWeek": "100.00%",
     "uptimeMonth": "100.00%",
     "uptimeYear": "100.00%",
-    "time": 834,
-    "timeDay": 808,
-    "timeWeek": 895,
-    "timeMonth": 834,
-    "timeYear": 834,
+    "time": 825,
+    "timeDay": 777,
+    "timeWeek": 850,
+    "timeMonth": 825,
+    "timeYear": 825,
     "dailyMinutesDown": {}
   }
 ]
