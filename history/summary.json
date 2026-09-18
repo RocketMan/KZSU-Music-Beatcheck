@@ -4,7 +4,7 @@
     "url": "https://kzsu.stanford.edu/",
     "icon": "https://icons.duckduckgo.com/ip3/kzsu.stanford.edu.ico",
     "slug": "kzsu",
-    "status": "up",
+    "status": "down",
     "uptime": "99.99%",
     "uptimeDay": "100.00%",
     "uptimeWeek": "100.00%",
@@ -13,7 +13,7 @@
     "time": 874,
     "timeDay": 946,
     "timeWeek": 725,
-    "timeMonth": 604,
+    "timeMonth": 605,
     "timeYear": 874,
     "dailyMinutesDown": {
       "2026-01-06": 40
@@ -33,7 +33,7 @@
     "time": 321,
     "timeDay": 489,
     "timeWeek": 356,
-    "timeMonth": 327,
+    "timeMonth": 330,
     "timeYear": 321,
     "dailyMinutesDown": {
       "2026-01-06": 39,
@@ -54,7 +54,7 @@
     "time": 213,
     "timeDay": 330,
     "timeWeek": 198,
-    "timeMonth": 177,
+    "timeMonth": 178,
     "timeYear": 213,
     "dailyMinutesDown": {
       "2025-11-19": 20,
@@ -76,7 +76,7 @@
     "time": 570,
     "timeDay": 546,
     "timeWeek": 549,
-    "timeMonth": 755,
+    "timeMonth": 667,
     "timeYear": 570,
     "dailyMinutesDown": {
       "2025-11-26": 1170,
